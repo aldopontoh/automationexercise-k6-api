@@ -3,9 +3,9 @@
 This document maintains 100% forward and backward traceability across all **14 AutomationExercise APIs**, **16 atomic PRD requirements (`API-REQ-*`)**, **16 ISTQB test cases (`API-TC-*`)**, and their corresponding **k6 implementation symbols and checks**.
 
 ## Summary Metrics
-- **Documented APIs Covered:** 14 / 14 (100%)
-- **Total Requirements (`API-REQ-*`):** 16 (7 Catalog/Search + 9 Account/Auth)
-- **Total Test Cases (`API-TC-*`):** 16 (1:1 mapped to requirements)
+- **Documented APIs Covered:** 14 / 14 (100%) + Duplicate-Email Idempotency Check
+- **Total Requirements (`API-REQ-*`):** 17 (7 Catalog/Search + 10 Account/Auth)
+- **Total Test Cases (`API-TC-*`):** 17 (1:1 mapped to requirements)
 - **Orphan Requirements / Unmapped Test Cases:** 0
 
 ## End-to-End Traceability Table
@@ -27,4 +27,5 @@ This document maintains 100% forward and backward traceability across all **14 A
 | **API 9** | `DELETE /api/verifyLogin` | `API-REQ-ACC-06` | `API-TC-ACC-06` | `scenarios/account-lifecycle.js` | `runAccountLifecycleScenario()` | `API 9 - DELETE /api/verifyLogin (405)` (`assertApiResponse`) |
 | **API 10** | `POST /api/verifyLogin` (invalid) | `API-REQ-ACC-07` | `API-TC-ACC-07` | `scenarios/account-lifecycle.js` | `runAccountLifecycleScenario()` | `API 10 - POST /api/verifyLogin (invalid 404)` (`assertApiResponse`) |
 | **API 12** | `DELETE /api/deleteAccount` (cleanup) | `API-REQ-ACC-08` | `API-TC-ACC-08` | `scenarios/account-lifecycle.js` | `runAccountLifecycleScenario()` (`finally`) | `API 12 - DELETE /api/deleteAccount (cleanup 200)` (`assertApiResponse`) |
-| **APIs 7–14** | Account Lifecycle SLA & Hygiene | `API-REQ-ACC-09` | `API-TC-ACC-09` | `lib/config.js`, `scenarios/account-lifecycle.js` | `buildUniqueTestUser()`, `THRESHOLDS` | `http_req_failed`, `http_req_duration`, `checks`, `api_contract_failures` |
+| **APIs 7–14** | Account Lifecycle SLA & Hygiene | `API-REQ-ACC-09` | `API-TC-ACC-09` | `lib/config.js`, `scenarios/account-lifecycle.js` | `buildUniqueTestUser()`, `getThresholds()` | `http_req_failed`, `http_req_duration{tier:search_auth}`, `http_req_duration{tier:write}`, `checks`, `api_contract_failures` |
+| **API 11 (Dup)** | `POST /api/createAccount` (duplicate email) | `API-REQ-ACC-10` | `API-TC-ACC-10` | `scenarios/account-lifecycle.js` | `runAccountLifecycleScenario()` | `API 11 - POST /api/createAccount (duplicate email 400)` (`assertApiResponse`) |

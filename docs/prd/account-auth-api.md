@@ -79,6 +79,14 @@ Covers AutomationExercise **APIs 7–14**: end-to-end self-cleaning user account
 - **Endpoints:** All endpoints in `scenarios/account-lifecycle.js` (APIs 7–14)
 - **Priority:** P1 (High)
 - **Acceptance Criteria (Given/When/Then):**
-  - **Given** multiple VUs execute isolated account lifecycles with unique dynamic emails and pacing `sleep()`,
+  - **Given** multiple VUs execute isolated account lifecycles with unique dynamic emails and pacing/think time,
   - **When** the full CRUD + auth flow executes,
-  - **Then** no VU collides on email registration, all SLA thresholds pass (`http_req_failed < 0.05`, `http_req_duration p(95) < 5000ms`, `checks > 0.99`), and every created account is deleted before iteration exit.
+  - **Then** no VU collides on email registration, all tiered SLA thresholds pass (`http_req_failed < 0.02` in smoke/load, `tier:search_auth p(95) < 2500ms`, `tier:write p(95) < 3500ms`, `checks > 0.99`), and every created account is deleted before iteration exit.
+
+### `API-REQ-ACC-10` — Duplicate-Email Registration Race / Idempotency Check (API 11 Negative)
+- **Endpoint:** `POST /api/createAccount` (re-submitted with already-registered `email`)
+- **Priority:** P1 (High)
+- **Acceptance Criteria (Given/When/Then):**
+  - **Given** a dynamic user account was just created in `API-REQ-ACC-01`,
+  - **When** a second `POST /api/createAccount` request is sent with the exact same `email`,
+  - **Then** the transport status is `200`, the JSON body contains `responseCode === 400`, and `message` equals `"Email already exists!"` instead of creating duplicate records or throwing HTTP 500.

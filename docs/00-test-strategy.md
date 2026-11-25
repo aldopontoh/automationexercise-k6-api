@@ -31,21 +31,28 @@
 
 ## 4. Load Profiles & Live-Site Safety Guardrails
 
-Two controlled execution profiles are selectable via `-e TEST_PROFILE=<smoke|load>`:
+Six controlled execution profiles are selectable via `-e TEST_PROFILE=<smoke|load|stress|spike|soak|throughput>`:
 
-| Profile | Mode | VUs / Stages | Pacing (`sleep`) | Purpose |
+| Profile | Mode / Executor | VUs / Stages | Pacing / Think Time | Traffic Pattern |
 | :--- | :--- | :--- | :--- | :--- |
-| **`smoke`** (default) | Shared iterations | `vus: 2`, `iterations: 2` (1 full iteration per VU covering APIs 1–14) | `0.5s` between steps | Fast CI gating, local validation, zero external server stress; cleanly overridable via CLI `--vus` / `--iterations` |
-| **`load`** | Staged ramp-up | `10s -> 3 VUs`, `20s -> 6 VUs`, `10s -> 0 VUs` | `0.5s–1.0s` between steps | Controlled multi-VU concurrency & p95 latency verification |
+| **`smoke`** (CI Default) | Shared iterations | `vus: 2`, `iterations: 2` | `0.6s` fixed pacing | Deterministic 100% APIs 1–14 + duplicate-email race check |
+| **`load`** (Average Load) | Ramping VUs | `10s -> 3`, `25s -> 6`, `10s -> 0` | `1–3s` randomized think time | 70% Browse/Search, 20% Auth, 10% Account CRUD |
+| **`stress`** (Peak / Stress) | Stepped VUs | `20s -> 4`, `20s -> 8`, `20s -> 12`, `20s -> 16`, `15s -> 0` | `1–3s` randomized think time | 70/20/10 weighted mix (safe public-host cap) |
+| **`spike`** (Spike Recovery) | Ramping VUs | `10s -> 2`, `5s -> 14`, `15s -> 14`, `5s -> 2`, `15s -> 2`, `5s -> 0` | `1–3s` randomized think time | Measures post-spike latency recovery |
+| **`soak`** (Endurance) | Ramping VUs | `15s -> 4`, `10m -> 4`, `15s -> 0` | `1–3s` randomized think time | Detects gradual latency/memory degradation |
+| **`throughput`** (Arrival Rate) | `constant-arrival-rate` | `2 iter/s` for `45s` (`preAllocatedVUs: 4`, `maxVUs: 12`) | `1–3s` randomized think time | Fixed arrival-rate throughput capacity test |
 
-## 5. SLA Thresholds & CI Quality Gates
+## 5. Tiered SLA Thresholds & CI Quality Gates
 
-| Metric | Threshold Expression | Rationale |
-| :--- | :--- | :--- |
-| `http_req_failed` | `rate<0.05` | Fewer than 5% transport-level HTTP errors (5xx / connection resets) |
-| `http_req_duration` | `p(95)<5000` | 95% of API responses over public internet complete under 5,000 ms |
-| `checks` | `rate>0.99` | At least 99% of functional, status, and JSON schema assertions pass |
-| `api_contract_failures` | `count==0` | Zero tolerance for unexpected JSON `responseCode` or missing required fields |
+| Metric / Endpoint Tier | Smoke / Load / Soak / Throughput | Stress / Spike | Rationale |
+| :--- | :--- | :--- | :--- |
+| `http_req_duration{tier:read}` | `p(95)<2000`, `p(99)<3000` | `p(95)<3500`, `p(99)<5000` | Read-only catalog endpoints (`APIs 1, 3`) stay fast |
+| `http_req_duration{tier:search_auth}` | `p(95)<2500` | `p(95)<4000` | Search & auth lookups (`APIs 5–10, 14`) stay responsive |
+| `http_req_duration{tier:write}` | `p(95)<3500` | `p(95)<5000` | DB mutation lifecycle (`APIs 11–13`) stays bounded |
+| `http_req_duration` (Global) | `p(95)<3500` | `p(95)<5000` | Tightened from `5000ms` based on live baseline (`~650–1500ms`) |
+| `http_req_failed` | `rate<0.02` | `rate<0.05` | Stricter 2% transport error budget for CI/load |
+| `checks` | `rate>0.99` | `rate>0.99` | Over 99% functional & JSON contract checks must pass |
+| `api_contract_failures` | `count==0` | `count==0` | Zero tolerance for JSON `responseCode` or schema violations |
 
 Threshold breach causes `k6` to return exit code `99`, automatically failing the Jenkins pipeline stage.
 

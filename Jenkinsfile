@@ -4,6 +4,9 @@ pipeline {
     environment {
         PATH = "${env.PATH};C:\\Program Files\\k6"
         TEST_PROFILE = 'smoke'
+        K6_WEB_DASHBOARD = 'true'
+        K6_WEB_DASHBOARD_PERIOD = '3s'
+        K6_WEB_DASHBOARD_EXPORT = 'reports/dashboard.html'
     }
 
     options {
@@ -38,7 +41,7 @@ pipeline {
             steps {
                 bat '''
                     @echo off
-                    k6 run -e TEST_PROFILE=%TEST_PROFILE% --summary-export=reports/summary.json scenarios/api-suite.js
+                    k6 run -e TEST_PROFILE=%TEST_PROFILE% scenarios/api-suite.js
                 '''
             }
         }

@@ -1,6 +1,6 @@
 # AutomationExercise k6 API Performance & Functional Verification Suite
 
-Modular Grafana k6 API test suite validating all 14 REST endpoints documented at [https://automationexercise.com/api_list](https://automationexercise.com/api_list), combining functional contract verification, CSV-driven search testing, self-cleaning user account lifecycles, SLA thresholds, and Windows Jenkins CI/CD execution.
+Modular Grafana k6 API performance & functional verification suite validating all 14 REST endpoints documented at [https://automationexercise.com/api_list](https://automationexercise.com/api_list) across **6 professional performance profiles**, tiered per-endpoint SLA thresholds, realistic e-commerce 70/20/10 traffic weighting, self-cleaning user lifecycles, dual visual HTML dashboards, and Windows Jenkins CI/CD.
 
 ## Repository Layout
 
@@ -9,79 +9,56 @@ automationexercise-k6-api/
 ├── data/
 │   └── search_terms.csv          # CSV data source for API 5 searchProduct variations
 ├── docs/
-│   ├── 00-test-strategy.md       # Risk-based k6 API test strategy & load profiles
+│   ├── 00-test-strategy.md       # Risk-based k6 API test strategy & 6 load profiles
 │   ├── TRACEABILITY.md           # 100% API -> API-REQ -> API-TC -> k6 mapping
-│   ├── prd/
-│   │   ├── 00-system-overview.md
-│   │   ├── catalog-search-api.md
-│   │   └── account-auth-api.md
-│   └── test-cases/
-│       ├── catalog-search-api.md
-│       └── account-auth-api.md
+│   ├── prd/                      # Per-module PRDs (API-REQ-CAT-01..07, API-REQ-ACC-01..10)
+│   └── test-cases/               # ISTQB Test Case Matrices (1:1 mapped)
 ├── lib/
 │   ├── assertions.js             # Safe JSON parsing & transport + responseCode checks
-│   └── config.js                 # Base URL, headers, load profiles, SLA thresholds
-├── reports/                      # Git-ignored runtime output summaries (summary.json)
+│   ├── config.js                 # 6 performance profiles, tiered SLAs, retry & thinkTime
+│   ├── html-reporter.js          # CSP-safe dark Grafana-style SVG visual dashboard
+│   └── metrics.js                # Custom per-tier latency, payload size & traffic mix metrics
+├── reports/                      # Git-ignored outputs (dashboard.html, summary.html, summary.json)
 ├── scenarios/
-│   ├── account-lifecycle.js      # APIs 7–14 (self-cleaning CRUD + auth negative paths)
-│   ├── api-suite.js              # Main orchestrator entry point
-│   └── catalog-search.js         # APIs 1–6 (products, brands, unsupported methods, search)
+│   ├── account-lifecycle.js      # APIs 7–14 + duplicate-email 400 race check + cleanup
+│   ├── api-suite.js              # Main orchestrator (smoke deterministic; load 70/20/10 mix)
+│   └── catalog-search.js         # APIs 1–6 (products, brands, unsupported methods, CSV search)
 ├── .gitignore
-├── GEMINI.md                     # Architectural & QA governance rules
-├── Jenkinsfile                   # Windows declarative CI/CD pipeline
+├── GEMINI.md
+├── Jenkinsfile                   # Windows CI/CD pipeline archiving HTML & JSON dashboards
 └── README.md
 ```
 
-## Prerequisites
+## 6 Professional Performance Profiles (`-e TEST_PROFILE=<name>`)
 
-- [Grafana k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) installed and available on `PATH` (verified with `k6 version`).
-- Network access to `https://automationexercise.com`.
+All profiles are safely calibrated for the public `automationexercise.com` demo server and support exporting k6's native interactive time-series dashboard (`reports/dashboard.html`) alongside our Jenkins-CSP-safe SVG dashboard (`reports/summary.html`):
 
-## Local Execution Commands
+| Profile | Command (Windows CMD) | VUs / Ramp | Traffic Pattern |
+| :--- | :--- | :--- | :--- |
+| **1. `smoke`** (CI Default) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=3s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run scenarios\api-suite.js` | `2 VUs`, `2 iters` | Deterministic 100% APIs 1–14 + duplicate-email check |
+| **2. `load`** (Average Load) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=3s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run -e TEST_PROFILE=load scenarios\api-suite.js` | `10s -> 3`, `25s -> 6`, `10s -> 0` | 70/20/10 weighted mix + 1–3s think time |
+| **3. `stress`** (Peak / Stress) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=3s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run -e TEST_PROFILE=stress scenarios\api-suite.js` | `4 -> 8 -> 12 -> 16 -> 0` | 70/20/10 mix (override via `-e STRESS_MAX_VUS=20`) |
+| **4. `spike`** (Spike Recovery) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=3s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run -e TEST_PROFILE=spike scenarios\api-suite.js` | `2 -> 14 (15s) -> 2 -> 0` | Measures post-spike latency recovery |
+| **5. `soak`** (Endurance) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=5s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run -e TEST_PROFILE=soak -e SOAK_DURATION=10m scenarios\api-suite.js` | Steady `4 VUs` for `10m` | Detects gradual latency drift / memory leaks |
+| **6. `throughput`** (Arrival Rate) | `set K6_WEB_DASHBOARD=true&& set K6_WEB_DASHBOARD_PERIOD=3s&& set K6_WEB_DASHBOARD_EXPORT=reports\dashboard.html&& k6 run -e TEST_PROFILE=throughput -e TARGET_RPS=2 scenarios\api-suite.js` | `constant-arrival-rate` (`2/s`, `45s`) | Forces fixed arrival rate regardless of latency |
 
-### 1. Default Suite Run (Controlled Smoke Profile)
-```cmd
-cd /d "D:\Work\Automation Projects\Playwright\automationexercise-k6-api"
-k6 run scenarios\api-suite.js
-```
+## Tiered SLA Thresholds (`lib/config.js`)
 
-### 2. Quick CLI Verification Smoke Run (2 VUs, 2 Shared Iterations = 1 per VU)
-```cmd
-k6 run --vus 2 --iterations 2 scenarios\api-suite.js
-```
-
-### 3. Staged Load Profile (Safe External-Site Ramp: up to 6 VUs)
-```cmd
-k6 run -e TEST_PROFILE=load --summary-export=reports\summary.json scenarios\api-suite.js
-```
-
-### 4. View Visual HTML Report
-Every run automatically generates a self-contained visual HTML dashboard in `reports/summary.html` (plus `reports/report.css` and `reports/summary.json`):
-```cmd
-cd /d "D:\Work\Automation Projects\Playwright\automationexercise-k6-api"
-if not exist reports mkdir reports
-k6 run scenarios\api-suite.js
-start "" "reports\summary.html"
-```
-In Jenkins, open `http://localhost:8080/job/automationexercise-k6-api-ci/lastSuccessfulBuild/artifact/reports/summary.html`.
-
-## Configured SLA Thresholds
-
-Defined in `lib/config.js` and enforced in `scenarios/api-suite.js`:
-
-| Metric | Threshold | Purpose |
+| Metric / Endpoint Tier | Smoke / Load / Soak / Throughput | Stress / Spike |
 | :--- | :--- | :--- |
-| `http_req_failed` | `rate<0.05` | Transport-level HTTP error rate must stay below 5% |
-| `http_req_duration` | `p(95)<5000` | 95th percentile response latency must remain under 5,000 ms |
-| `checks` | `rate>0.99` | Over 99% of functional & contract checks must pass |
-| `api_contract_failures` | `count==0` | Custom counter ensuring zero critical JSON contract violations |
+| `http_req_duration{tier:read}` (APIs 1, 3) | `p(95)<2000`, `p(99)<3000` | `p(95)<3500`, `p(99)<5000` |
+| `http_req_duration{tier:search_auth}` (APIs 5–10, 14) | `p(95)<2500` | `p(95)<4000` |
+| `http_req_duration{tier:write}` (APIs 11–13) | `p(95)<3500` | `p(95)<5000` |
+| `http_req_duration` (Global) | `p(95)<3500` | `p(95)<5000` |
+| `http_req_failed` | `rate<0.02` | `rate<0.05` |
+| `checks` | `rate>0.99` | `rate>0.99` |
+| `api_contract_failures` | `count==0` | `count==0` |
 
-If any threshold fails, `k6` automatically exits with a non-zero exit code (code `99`), failing the Jenkins build.
+## Viewing the Visual Dashboards
 
-## Jenkins CI/CD Pipeline (`automationexercise-k6-api-ci`)
-
-The Windows-compatible `Jenkinsfile` executes the following stages:
-1. **Checkout**: Pulls branch `main` from `https://github.com/aldopontoh/automationexercise-k6-api.git`.
-2. **Verify k6 & Clean Workspace Reports**: Verifies `k6 version` on `PATH` and recreates a clean `reports/` directory.
-3. **Run k6 API Suite**: Executes `k6 run --summary-export=reports/summary.json scenarios/api-suite.js` in CLI mode, failing the build if any threshold or check breaches SLA.
-4. **Post (Always)**: Archives `reports/**` with `allowEmptyArchive: true` so summary metrics are preserved on both passing and failing runs.
+1. **Interactive k6 Native Time-Series Web Dashboard (Picture 3 UI):**
+   - Local: `start "" "D:\Work\Automation Projects\Playwright\automationexercise-k6-api\reports\dashboard.html"`
+   - Jenkins Artifact: `http://localhost:8080/job/automationexercise-k6-api-ci/lastSuccessfulBuild/artifact/reports/dashboard.html` *(download & open locally if Jenkins default CSP blocks inline JS)*
+2. **CSP-Safe Dark SVG Performance Dashboard (renders natively inside Jenkins UI):**
+   - Local: `start "" "D:\Work\Automation Projects\Playwright\automationexercise-k6-api\reports\summary.html"`
+   - Jenkins Artifact: `http://localhost:8080/job/automationexercise-k6-api-ci/lastSuccessfulBuild/artifact/reports/summary.html`
