@@ -1,4 +1,3 @@
-import http from 'k6/http';
 import { fail, group, sleep } from 'k6';
 import {
   BASE_URL,
@@ -6,6 +5,7 @@ import {
   FORM_HEADERS,
   PACING_SECONDS,
   buildFormBody,
+  requestWithRetry,
 } from '../lib/config.js';
 import { assertApiResponse } from '../lib/assertions.js';
 
@@ -57,7 +57,7 @@ export function runAccountLifecycleScenario() {
     };
 
     // API 11: POST /api/createAccount -> 201 (API-REQ-ACC-01 / API-TC-ACC-01)
-    const createRes = http.post(`${BASE_URL}/api/createAccount`, buildFormBody(user), {
+    const createRes = requestWithRetry('POST', `${BASE_URL}/api/createAccount`, buildFormBody(user), {
       headers: FORM_HEADERS,
       tags: { api: 'API-11-createAccount-POST', module: 'account-lifecycle' },
     });
@@ -73,7 +73,8 @@ export function runAccountLifecycleScenario() {
 
     try {
       // API 7: POST /api/verifyLogin with valid details -> 200 (API-REQ-ACC-02 / API-TC-ACC-02)
-      const loginValidRes = http.post(
+      const loginValidRes = requestWithRetry(
+        'POST',
         `${BASE_URL}/api/verifyLogin`,
         buildFormBody({ email: user.email, password: user.password }),
         {
@@ -92,8 +93,10 @@ export function runAccountLifecycleScenario() {
       sleep(PACING_SECONDS);
 
       // API 14: GET /api/getUserDetailByEmail -> 200 (API-REQ-ACC-03 / API-TC-ACC-03)
-      const getUserRes = http.get(
+      const getUserRes = requestWithRetry(
+        'GET',
         `${BASE_URL}/api/getUserDetailByEmail?email=${encodeURIComponent(user.email)}`,
+        null,
         {
           headers: DEFAULT_HEADERS,
           tags: { api: 'API-14-getUserDetailByEmail-GET', module: 'account-lifecycle' },
@@ -119,10 +122,15 @@ export function runAccountLifecycleScenario() {
         company: 'QA Automation Lab Updated',
         city: 'San Francisco',
       };
-      const updateRes = http.put(`${BASE_URL}/api/updateAccount`, buildFormBody(updatedUser), {
-        headers: FORM_HEADERS,
-        tags: { api: 'API-13-updateAccount-PUT', module: 'account-lifecycle' },
-      });
+      const updateRes = requestWithRetry(
+        'PUT',
+        `${BASE_URL}/api/updateAccount`,
+        buildFormBody(updatedUser),
+        {
+          headers: FORM_HEADERS,
+          tags: { api: 'API-13-updateAccount-PUT', module: 'account-lifecycle' },
+        }
+      );
       recordFailure(
         assertApiResponse(updateRes, {
           label: 'API 13 - PUT /api/updateAccount (200)',
@@ -134,7 +142,8 @@ export function runAccountLifecycleScenario() {
       sleep(PACING_SECONDS);
 
       // API 8: POST /api/verifyLogin without email parameter -> 400 (API-REQ-ACC-05 / API-TC-ACC-05)
-      const loginMissingEmailRes = http.post(
+      const loginMissingEmailRes = requestWithRetry(
+        'POST',
         `${BASE_URL}/api/verifyLogin`,
         buildFormBody({ password: user.password }),
         {
@@ -153,7 +162,7 @@ export function runAccountLifecycleScenario() {
       sleep(PACING_SECONDS);
 
       // API 9: DELETE /api/verifyLogin -> 405 (API-REQ-ACC-06 / API-TC-ACC-06)
-      const loginDeleteRes = http.del(`${BASE_URL}/api/verifyLogin`, null, {
+      const loginDeleteRes = requestWithRetry('DELETE', `${BASE_URL}/api/verifyLogin`, null, {
         headers: FORM_HEADERS,
         tags: { api: 'API-9-verifyLogin-DELETE', module: 'account-lifecycle' },
       });
@@ -168,7 +177,8 @@ export function runAccountLifecycleScenario() {
       sleep(PACING_SECONDS);
 
       // API 10: POST /api/verifyLogin with invalid details -> 404 (API-REQ-ACC-07 / API-TC-ACC-07)
-      const loginInvalidRes = http.post(
+      const loginInvalidRes = requestWithRetry(
+        'POST',
         `${BASE_URL}/api/verifyLogin`,
         buildFormBody({
           email: `nonexistent_${__VU}_${__ITER}_${Date.now()}@testmail.local`,
@@ -192,7 +202,8 @@ export function runAccountLifecycleScenario() {
       // API 12: DELETE /api/deleteAccount -> 200 (API-REQ-ACC-08 / API-TC-ACC-08)
       // Always executed whenever accountCreated is true to guarantee zero orphaned test users.
       if (accountCreated) {
-        const deleteRes = http.del(
+        const deleteRes = requestWithRetry(
+          'DELETE',
           `${BASE_URL}/api/deleteAccount`,
           buildFormBody({ email: user.email, password: user.password }),
           {

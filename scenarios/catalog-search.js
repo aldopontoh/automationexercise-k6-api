@@ -1,4 +1,3 @@
-import http from 'k6/http';
 import { group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import {
@@ -8,6 +7,7 @@ import {
   PACING_SECONDS,
   TEST_PROFILE,
   buildFormBody,
+  requestWithRetry,
 } from '../lib/config.js';
 import { assertApiResponse } from '../lib/assertions.js';
 
@@ -27,7 +27,7 @@ const searchTerms = new SharedArray('search_terms', () => {
 export function runCatalogSearchScenario() {
   group('Catalog & Search API (APIs 1-6)', () => {
     // API 1: GET /api/productsList (API-REQ-CAT-01 / API-TC-CAT-01)
-    const productsRes = http.get(`${BASE_URL}/api/productsList`, {
+    const productsRes = requestWithRetry('GET', `${BASE_URL}/api/productsList`, null, {
       headers: DEFAULT_HEADERS,
       tags: { api: 'API-1-productsList-GET', module: 'catalog-search' },
     });
@@ -47,7 +47,7 @@ export function runCatalogSearchScenario() {
     sleep(PACING_SECONDS);
 
     // API 2: POST /api/productsList -> 405 (API-REQ-CAT-02 / API-TC-CAT-02)
-    const productsPostRes = http.post(`${BASE_URL}/api/productsList`, null, {
+    const productsPostRes = requestWithRetry('POST', `${BASE_URL}/api/productsList`, null, {
       headers: FORM_HEADERS,
       tags: { api: 'API-2-productsList-POST', module: 'catalog-search' },
     });
@@ -61,7 +61,7 @@ export function runCatalogSearchScenario() {
     sleep(PACING_SECONDS);
 
     // API 3: GET /api/brandsList (API-REQ-CAT-03 / API-TC-CAT-03)
-    const brandsRes = http.get(`${BASE_URL}/api/brandsList`, {
+    const brandsRes = requestWithRetry('GET', `${BASE_URL}/api/brandsList`, null, {
       headers: DEFAULT_HEADERS,
       tags: { api: 'API-3-brandsList-GET', module: 'catalog-search' },
     });
@@ -81,7 +81,7 @@ export function runCatalogSearchScenario() {
     sleep(PACING_SECONDS);
 
     // API 4: PUT /api/brandsList -> 405 (API-REQ-CAT-04 / API-TC-CAT-04)
-    const brandsPutRes = http.put(`${BASE_URL}/api/brandsList`, null, {
+    const brandsPutRes = requestWithRetry('PUT', `${BASE_URL}/api/brandsList`, null, {
       headers: FORM_HEADERS,
       tags: { api: 'API-4-brandsList-PUT', module: 'catalog-search' },
     });
@@ -103,7 +103,8 @@ export function runCatalogSearchScenario() {
         : searchTerms;
 
     for (const term of termsToRun) {
-      const searchRes = http.post(
+      const searchRes = requestWithRetry(
+        'POST',
         `${BASE_URL}/api/searchProduct`,
         buildFormBody({ search_product: term }),
         {
@@ -129,7 +130,7 @@ export function runCatalogSearchScenario() {
     }
 
     // API 6: POST /api/searchProduct without search_product -> 400 (API-REQ-CAT-06 / API-TC-CAT-06)
-    const missingParamRes = http.post(`${BASE_URL}/api/searchProduct`, null, {
+    const missingParamRes = requestWithRetry('POST', `${BASE_URL}/api/searchProduct`, null, {
       headers: FORM_HEADERS,
       tags: { api: 'API-6-searchProduct-missing-param', module: 'catalog-search' },
     });
