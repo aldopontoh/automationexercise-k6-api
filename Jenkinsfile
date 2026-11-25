@@ -3,15 +3,7 @@ pipeline {
 
     environment {
         PATH = "${env.PATH};C:\\Program Files\\k6"
-        TEST_PROFILE = "${params.TEST_PROFILE ?: 'smoke'}"
-    }
-
-    parameters {
-        choice(
-            name: 'TEST_PROFILE',
-            choices: ['smoke', 'load'],
-            description: 'Select k6 execution profile (smoke = controlled CI verification, load = staged ramp-up)'
-        )
+        TEST_PROFILE = 'smoke'
     }
 
     options {
