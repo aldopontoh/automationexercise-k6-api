@@ -55,10 +55,15 @@ k6 run --vus 2 --iterations 2 scenarios\api-suite.js
 k6 run -e TEST_PROFILE=load --summary-export=reports\summary.json scenarios\api-suite.js
 ```
 
-### 4. Export Summary Artifact (CI Parity)
+### 4. View Visual HTML Report
+Every run automatically generates a self-contained visual HTML dashboard in `reports/summary.html` (plus `reports/report.css` and `reports/summary.json`):
 ```cmd
-k6 run --summary-export=reports\summary.json scenarios\api-suite.js
+cd /d "D:\Work\Automation Projects\Playwright\automationexercise-k6-api"
+if not exist reports mkdir reports
+k6 run scenarios\api-suite.js
+start "" "reports\summary.html"
 ```
+In Jenkins, open `http://localhost:8080/job/automationexercise-k6-api-ci/lastSuccessfulBuild/artifact/reports/summary.html`.
 
 ## Configured SLA Thresholds
 

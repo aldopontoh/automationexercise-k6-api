@@ -1,5 +1,6 @@
 import { sleep } from 'k6';
 import { getSuiteOptions } from '../lib/config.js';
+import { REPORT_CSS, generateHtmlReport, generateTextSummary } from '../lib/html-reporter.js';
 import { runCatalogSearchScenario } from './catalog-search.js';
 import { runAccountLifecycleScenario } from './account-lifecycle.js';
 
@@ -17,4 +18,17 @@ export default function () {
 
   runCatalogSearchScenario();
   runAccountLifecycleScenario();
+}
+
+/**
+ * Generates a self-contained, Jenkins-CSP-compatible visual HTML report,
+ * raw JSON summary, and formatted CLI stdout summary on every run.
+ */
+export function handleSummary(data) {
+  return {
+    'reports/summary.html': generateHtmlReport(data),
+    'reports/report.css': REPORT_CSS,
+    'reports/summary.json': JSON.stringify(data, null, 2),
+    stdout: generateTextSummary(data),
+  };
 }
